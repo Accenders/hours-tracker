@@ -1,0 +1,1 @@
+cd /Users/yuvalmoradov/VSCode/hours-tracker && .venv/bin/streamlit run app.py

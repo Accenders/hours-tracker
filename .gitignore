@@ -1,0 +1,12 @@
+# סביבה
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+
+# פרטי גישה — לעולם לא לגיט
+.env
+credentials.json
+
+# Streamlit
+.streamlit/secrets.toml
