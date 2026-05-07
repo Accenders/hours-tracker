@@ -1,7 +1,7 @@
 # Project: Hours & Salary Reporting Platform
 
 > Spec and progress tracking file. Updated each session to resume from the same point.
-> Last updated: May 2026 — Session 6
+> Last updated: May 2026 — Session 7
 
 ---
 
@@ -195,7 +195,8 @@ hours-tracker/
 - [ ] Build charts dashboard (Plotly)
 - [ ] Build history page
 - [ ] Connect Claude API — advice bot
-- [ ] Deploy to Streamlit Cloud
+- [x] Deploy to Streamlit Cloud — repo at github.com/Accenders/hours-tracker, hosted on Streamlit Community Cloud
+- [x] iPhone access — save app URL to home screen as PWA
 - [ ] Testing with real data
 
 ---
@@ -224,9 +225,16 @@ hours-tracker/
 - **Vacation/sick/holiday**: all paid in full (hours × rate). Vacation+sick reduce quota, holiday does not
 - **`work_days` in calc_salary**: pass `reimbursable_days`, not total work days
 
-### Run Command
+### Deployment
+- GitHub repo: `github.com/Accenders/hours-tracker` (public)
+- Hosted on Streamlit Community Cloud — auto-deploys on every `git push`
+- Secrets (Google credentials) stored in Streamlit Cloud secrets manager, NOT in the repo
+- To update the live app: make changes locally → `git push` → Streamlit rebuilds automatically (~1 min)
+
+### Run Locally
 ```
 cd /Users/yuvalmoradov/VSCode/hours-tracker && .venv/bin/streamlit run app.py --server.headless true
 ```
 - RTL is activated via `app.py` only — no need to call it on every page
 - Settings form keys start with `s_` (s_hourly_rate, s_meals, etc.) — must be preserved to avoid conflicts
+- Local secrets file (gitignored): `.streamlit/secrets.toml`
