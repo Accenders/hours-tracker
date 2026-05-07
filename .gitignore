@@ -7,6 +7,7 @@ __pycache__/
 # פרטי גישה — לעולם לא לגיט
 .env
 credentials.json
+gen-lang-client-*.json
 
 # Streamlit
 .streamlit/secrets.toml

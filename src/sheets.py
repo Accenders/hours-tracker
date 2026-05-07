@@ -1,4 +1,5 @@
 import gspread
+import streamlit as st
 from google.oauth2.service_account import Credentials
 from src.config import CREDENTIALS_PATH, SHEET_NAME, SHEET_HOURS, SHEET_PARAMS, SHEET_SUMMARY
 
@@ -19,8 +20,13 @@ SCOPES = [
     "https://www.googleapis.com/auth/drive",
 ]
 
+@st.cache_resource
 def get_client():
-    creds = Credentials.from_service_account_file(CREDENTIALS_PATH, scopes=SCOPES)
+    try:
+        creds_info = dict(st.secrets["google_credentials"])
+        creds = Credentials.from_service_account_info(creds_info, scopes=SCOPES)
+    except Exception:
+        creds = Credentials.from_service_account_file(CREDENTIALS_PATH, scopes=SCOPES)
     return gspread.authorize(creds)
 
 def get_spreadsheet():
@@ -102,3 +108,10 @@ def add_hour_entry(date_str: str, hours: float, notes: str = "",
 def delete_hour_entry(row_index: int):
     ws = get_spreadsheet().worksheet(SHEET_HOURS)
     ws.delete_rows(row_index)
+
+
+def update_hour_entry(row_index: int, date_str: str, hours: float, notes: str,
+                      location: str, office_hours: float, entry_type: str):
+    ws = get_spreadsheet().worksheet(SHEET_HOURS)
+    ws.update(f"A{row_index}:F{row_index}",
+              [[date_str, hours, notes, location, office_hours, entry_type]])

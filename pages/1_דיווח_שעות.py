@@ -1,6 +1,6 @@
 import streamlit as st
 from datetime import date, datetime, timedelta
-from src.sheets import get_all_hours, add_hour_entry, delete_hour_entry
+from src.sheets import get_all_hours, add_hour_entry, delete_hour_entry, update_hour_entry
 
 st.title("📝 דיווח שעות")
 
@@ -12,6 +12,8 @@ LOCATIONS = ["משרד 🏢", "בית 🏠", "היברידי 🔀"]
 
 if "clock_in_time" not in st.session_state:
     st.session_state.clock_in_time = None
+if "editing_row" not in st.session_state:
+    st.session_state.editing_row = None
 if "quick_location" not in st.session_state:
     st.session_state.quick_location = LOCATIONS[0]
 if "quick_office_hours" not in st.session_state:
@@ -53,13 +55,13 @@ st.subheader("הוספת יום עבודה")
 tab_hours, tab_clock, tab_absence = st.tabs(["⏱️ לפי מספר שעות", "🕐 לפי שעות כניסה ויציאה", "🏖️ היעדרות"])
 
 with tab_hours:
+    entry_loc = st.radio("מיקום", LOCATIONS, horizontal=True, key="form_hours_loc")
     with st.form("add_by_hours", clear_on_submit=True):
         col1, col2 = st.columns(2)
         with col1:
             entry_date = st.date_input("תאריך", value=date.today(), format="DD/MM/YYYY")
         with col2:
             entry_hours = st.number_input("שעות", min_value=0.5, max_value=24.0, step=0.5, value=8.0)
-        entry_loc = st.radio("מיקום", LOCATIONS, horizontal=True, key="form_hours_loc")
         entry_office_h = 0.0
         if "היברידי" in entry_loc:
             entry_office_h = st.number_input(
@@ -76,6 +78,7 @@ with tab_hours:
         st.rerun()
 
 with tab_clock:
+    clock_loc = st.radio("מיקום", LOCATIONS, horizontal=True, key="form_clock_loc")
     with st.form("add_by_clock", clear_on_submit=True):
         col1, col2, col3 = st.columns(3)
         with col1:
@@ -84,7 +87,6 @@ with tab_clock:
             start_str = st.text_input("שעת כניסה", placeholder="נא להזין", key="clock_start")
         with col3:
             end_str = st.text_input("שעת יציאה", placeholder="נא להזין", key="clock_end")
-        clock_loc = st.radio("מיקום", LOCATIONS, horizontal=True, key="form_clock_loc")
         clock_office_h = 0.0
         if "היברידי" in clock_loc:
             clock_office_h = st.number_input(
@@ -158,8 +160,12 @@ else:
     LOC_ICON = {"משרד": "🏢", "בית": "🏠", "היברידי": "🔀"}
     TYPE_ICON = {"עבודה": "", "חופש": "🏖️", "מחלה": "🤒", "חג": "✡️"}
 
+    ABSENCE_LABELS = {"חופש": "חופש 🏖️", "מחלה": "מחלה 🤒", "חג": "חג ✡️"}
+    ABSENCE_TYPES_REV = {v: k for k, v in ABSENCE_LABELS.items()}
+    LOC_MAP = {"משרד": "משרד 🏢", "בית": "בית 🏠", "היברידי": "היברידי 🔀"}
+
     for entry in sorted(entries, key=lambda x: x["date"], reverse=True):
-        col1, col2, col3, col4, col5 = st.columns([3, 2, 2, 3, 1])
+        col1, col2, col3, col4, col5, col6 = st.columns([3, 2, 2, 3, 1, 1])
         with col1:
             try:
                 y, m, d = entry["date"].split("-")
@@ -182,7 +188,72 @@ else:
         with col4:
             st.write(entry["notes"] if entry["notes"] else "—")
         with col5:
+            if st.button("✏️", key=f"edit_{entry['row_index']}"):
+                st.session_state.editing_row = (
+                    None if st.session_state.editing_row == entry["row_index"]
+                    else entry["row_index"]
+                )
+                st.rerun()
+        with col6:
             if st.button("🗑️", key=f"del_{entry['row_index']}"):
                 with st.spinner("מוחק..."):
                     delete_hour_entry(entry["row_index"])
+                if st.session_state.editing_row == entry["row_index"]:
+                    st.session_state.editing_row = None
                 st.rerun()
+
+        if st.session_state.editing_row == entry["row_index"]:
+            with st.container(border=True):
+                st.caption("✏️ עריכת דיווח")
+                etype = entry.get("entry_type", "עבודה")
+                ecol1, ecol2 = st.columns(2)
+                with ecol1:
+                    try:
+                        current_date = date.fromisoformat(entry["date"])
+                    except Exception:
+                        current_date = date.today()
+                    edit_date = st.date_input("תאריך", value=current_date,
+                                              format="DD/MM/YYYY", key=f"ed_date_{entry['row_index']}")
+                with ecol2:
+                    edit_hours = st.number_input("שעות", min_value=0.5, max_value=24.0, step=0.5,
+                                                 value=float(entry["hours"]), key=f"ed_hours_{entry['row_index']}")
+                if etype == "עבודה":
+                    current_loc_label = LOC_MAP.get(entry.get("location", "משרד"), "משרד 🏢")
+                    loc_index = LOCATIONS.index(current_loc_label) if current_loc_label in LOCATIONS else 0
+                    edit_loc = st.radio("מיקום", LOCATIONS, index=loc_index,
+                                        horizontal=True, key=f"ed_loc_{entry['row_index']}")
+                    edit_office_h = 0.0
+                    if "היברידי" in edit_loc:
+                        edit_office_h = st.number_input(
+                            "שעות במשרד", min_value=0.5, max_value=24.0, step=0.5,
+                            value=max(0.5, float(entry.get("office_hours", 4.0))),
+                            key=f"ed_oh_{entry['row_index']}")
+                    edit_entry_type = "עבודה"
+                    edit_loc_clean = edit_loc.split()[0]
+                else:
+                    abs_labels = list(ABSENCE_LABELS.values())
+                    current_abs_label = ABSENCE_LABELS.get(etype, "חופש 🏖️")
+                    abs_index = abs_labels.index(current_abs_label) if current_abs_label in abs_labels else 0
+                    edit_abs = st.radio("סוג היעדרות", abs_labels, index=abs_index,
+                                        horizontal=True, key=f"ed_abs_{entry['row_index']}")
+                    edit_entry_type = ABSENCE_TYPES_REV[edit_abs]
+                    edit_office_h = 0.0
+                    edit_loc_clean = "—"
+                edit_notes = st.text_input("הערות", value=entry.get("notes", ""),
+                                           key=f"ed_notes_{entry['row_index']}")
+                save_col, cancel_col = st.columns(2)
+                with save_col:
+                    if st.button("💾 שמור", key=f"save_{entry['row_index']}",
+                                 use_container_width=True, type="primary"):
+                        with st.spinner("שומר..."):
+                            update_hour_entry(entry["row_index"],
+                                              edit_date.strftime("%Y-%m-%d"),
+                                              edit_hours, edit_notes,
+                                              edit_loc_clean, edit_office_h, edit_entry_type)
+                        st.session_state.editing_row = None
+                        st.rerun()
+                with cancel_col:
+                    if st.button("❌ בטל", key=f"cancel_{entry['row_index']}",
+                                 use_container_width=True):
+                        st.session_state.editing_row = None
+                        st.rerun()
